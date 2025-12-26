@@ -1,0 +1,35 @@
+# mount point           fstype            device                                        flags
+
+/boot				emmc		/dev/block/by-name/boot											flags=display=boot;slotselect;backup;flashimg
+/vendor_boot		emmc		/dev/block/by-name/vendor_boot									flags=display=vendor_boot;slotselect;backup;flashimg
+/vbmeta				emmc		/dev/block/by-name/vbmeta										flags=display=vbmeta;slotselect;backup;flashimg
+/vbmeta_system		emmc		/dev/block/by-name/vbmeta_system								flags=display=vbmeta_system;slotselect;backup;flashimg
+/vbmeta_vendor		emmc		/dev/block/by-name/vbmeta_vendor								flags=display=vbmeta_vendor;slotselect;backup;flashimg
+
+# Firmware
+/dtbo			emmc		/dev/block/by-name/dtbo											flags=display=dtbo;slotselect;backup
+/metadata		emmc		/dev/block/by-name/metadata										flags=display=metadata;
+/misc			emmc		/dev/block/by-name/misc											flags=display=misc;backup
+/modem          emmc        /dev/block/by-name/modem           								flags=slotselect;backup=1;flashimg=1
+
+
+/fsg                    emmc              /dev/block/by-name/fsg             flags=slotselect;backup=1
+/cid                    emmc              /dev/block/by-name/cid             flags=backup=1
+/modemst1               emmc              /dev/block/by-name/modemst1        flags=backup=1
+/modemst2               emmc              /dev/block/by-name/modemst2        flags=backup=1
+/persist                emmc              /dev/block/by-name/persist         flags=backup=1
+/prodpersist            emmc              /dev/block/by-name/prodpersist     flags=backup=1
+
+# Flashable logical partitions
+/system_image	    emmc		/dev/block/mapper/system							flags=backup=0;flashimg;display="System Image"
+/system_ext_image	emmc		/dev/block/mapper/system_ext						flags=backup=0;flashimg;display="System_Ext Image"
+/vendor_image	    emmc		/dev/block/mapper/vendor							flags=backup=0;flashimg;display="Vendor Image"
+/product_image	  emmc			/dev/block/mapper/product							flags=backup=0;flashimg;display="Product Image"
+
+
+# Internal , OTA & external storage
+/data                  f2fs               /dev/block/by-name/userdata                        flags=fileencryption=ice:aes-256-cts
+/external_sd           auto               /dev/block/mmcblk1p1                    /dev/block/mmcblk1    flags=storage;wipeingui;removable
+/usb-otg               auto               /dev/block/sdg1                         /dev/block/sdg        flags=storage;wipeingui;removable
+
+

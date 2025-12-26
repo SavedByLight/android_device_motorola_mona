@@ -1,0 +1,9 @@
+# Soft dependencies extracted from modules themselves.
+softdep pinctrl_ravelin pre: qcom_tlmm_vm_irqchip
+softdep qsee_ipc_irq_bridge pre: qcom_ipcc
+softdep smem pre: qcom_hwspinlock
+softdep dwc3_msm pre: phy-generic phy-msm-snps-hs phy-msm-ssusb-qmp eud
+softdep pinctrl_msm pre: qcom-pdc
+softdep sched_walt pre: socinfo
+softdep leds_qti_tri_led pre: pwm-qti-lpg
+softdep pinctrl_parrot pre: qcom_tlmm_vm_irqchip

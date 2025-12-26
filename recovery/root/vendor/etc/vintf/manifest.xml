@@ -1,0 +1,41 @@
+<!--
+    Input:
+        device/qcom/parrot66/manifest_parrot.xml
+        device/moto/mona/manifest_mona.xml
+-->
+<manifest version="4.0" type="device" target-level="202404">
+    <hal format="aidl">
+        <name>android.hardware.drm</name>
+        <fqname>IDrmFactory/wfdhdcp</fqname>
+    </hal>
+    <hal format="aidl">
+        <name>android.hardware.gatekeeper</name>
+        <fqname>IGatekeeper/default</fqname>
+    </hal>
+    <hal format="aidl">
+        <name>android.hardware.nfc</name>
+        <fqname>INfc/default</fqname>
+    </hal>
+    <hal format="aidl">
+        <name>android.hardware.secure_element</name>
+        <fqname>ISecureElement/eSE1</fqname>
+    </hal>
+    <hal format="aidl">
+        <name>vendor.nxp.nxpnfc_aidl</name>
+        <fqname>INxpNfc/default</fqname>
+    </hal>
+    <hal format="aidl">
+        <name>vendor.qti.hardware.wifidisplaysession_aidl</name>
+        <fqname>IWifiDisplaySession/default</fqname>
+        <fqname>IWifiDisplaySessionAudioTrack/default</fqname>
+        <fqname>IWifiDisplaySessionImageTrack/default</fqname>
+        <fqname>IWifiDisplaySessionVideoTrack/default</fqname>
+    </hal>
+    <hal format="hidl" override="true">
+        <name>vendor.qti.memory.pasrmanager</name>
+        <transport>hwbinder</transport>
+    </hal>
+    <sepolicy>
+        <version>202404</version>
+    </sepolicy>
+</manifest>

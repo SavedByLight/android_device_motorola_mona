@@ -22,14 +22,18 @@ AB_OTA_UPDATER := true
 TARGET_ENFORCE_AB_OTA_PARTITION_LIST := true
 
 AB_OTA_PARTITIONS += \
+    odm \
     boot \
     dtbo \
     product \
     system \
     system_ext \
+    system_dlkm \
     vbmeta \
     vbmeta_system \
     vendor \
+    vendor_dlkm \
+    init_boot \
     vendor_boot
 
 AB_OTA_POSTINSTALL_CONFIG += \
@@ -76,7 +80,3 @@ PRODUCT_TARGET_VNDK_VERSION := 30
 # Soong namespaces
 PRODUCT_SOONG_NAMESPACES += \
     $(LOCAL_PATH)
-
-#PRODUCT_COPY_FILES += \
-    $(call find-copy-subdir-files,*,device/motorola/mona/prebuilt/modules,$(TARGET_COPY_OUT_VENDOR_RAMDISK)/lib/modules) \
-    $(LOCAL_PATH)/prebuilt/fstab.qcom:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/first_stage_ramdisk/fstab.qcom

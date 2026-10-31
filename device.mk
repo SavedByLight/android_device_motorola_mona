@@ -5,75 +5,19 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+# Device-specific recovery packages; retain stock dynamic partition support.
 LOCAL_PATH := device/motorola/mona
-
-
-# Enable project quotas and casefolding for emulated storage without sdcardfs
+PRODUCT_BUILD_RECOVERY_IMAGE := true
+PRODUCT_BUILD_BOOT_IMAGE := false
 $(call inherit-product, $(SRC_TARGET_DIR)/product/emulated_storage.mk)
-
-# Enable virtual A/B OTA
-$(call inherit-product, $(SRC_TARGET_DIR)/product/virtual_ab_ota.mk) 
-
-# A/B
-AB_OTA_UPDATER := true
-TARGET_ENFORCE_AB_OTA_PARTITION_LIST := true
-
-AB_OTA_PARTITIONS += \
-    odm \
-    boot \
-    dtbo \
-    product \
-    system \
-    system_ext \
-    system_dlkm \
-    vbmeta \
-    vbmeta_system \
-    vendor \
-    vendor_dlkm \
-    init_boot \
-    vendor_boot
-
-AB_OTA_POSTINSTALL_CONFIG += \
-    RUN_POSTINSTALL_system=true \
-    POSTINSTALL_PATH_system=system/bin/otapreopt_script \
-    FILESYSTEM_TYPE_system=ext4 \
-    POSTINSTALL_OPTIONAL_system=true
-
-AB_OTA_POSTINSTALL_CONFIG += \
-    RUN_POSTINSTALL_vendor=true \
-    POSTINSTALL_PATH_vendor=bin/checkpoint_gc \
-    FILESYSTEM_TYPE_vendor=ext4 \
-    POSTINSTALL_OPTIONAL_vendor=true
-
-# Boot control
-PRODUCT_PACKAGES += \
-    android.hardware.boot@1.1-impl-qti.recovery \
-    bootctrl.parrot.recovery
-
-# fastbootd
-PRODUCT_PACKAGES += \
-    android.hardware.fastboot@1.0-impl-mock \
-    fastbootd
-
-# Partitions
+$(call inherit-product, $(SRC_TARGET_DIR)/product/virtual_ab_ota.mk)
 PRODUCT_USE_DYNAMIC_PARTITIONS := true
-
-PRODUCT_PACKAGES += \
-    otapreopt_script \
-    cppreopts.sh \
-    update_engine \
-    update_verifier \
-    update_engine_sideload
-
-# qcom encrpytion
-PRODUCT_PACKAGES += \
-    qcom_decrypt \
-    qcom_decrypt_fbe
-
-# Shipping level
+AB_OTA_UPDATER := true
+AB_OTA_PARTITIONS := boot init_boot vendor_boot recovery dtbo vbmeta vbmeta_system system system_ext product vendor vendor_dlkm system_dlkm odm
+PRODUCT_OTA_ENFORCE_VINTF_KERNEL_REQUIREMENTS := false
+PRODUCT_PACKAGES += android.hardware.boot@1.1-impl-qti.recovery bootctrl.parrot.recovery
+PRODUCT_PACKAGES += android.hardware.fastboot@1.0-impl-mock fastbootd
+PRODUCT_PACKAGES += update_engine_sideload update_verifier
 PRODUCT_SHIPPING_API_LEVEL := 30
 PRODUCT_TARGET_VNDK_VERSION := 30
-
-# Soong namespaces
-PRODUCT_SOONG_NAMESPACES += \
-    $(LOCAL_PATH)
+PRODUCT_SOONG_NAMESPACES += $(LOCAL_PATH)

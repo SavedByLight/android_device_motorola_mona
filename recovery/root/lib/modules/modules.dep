@@ -250,3 +250,19 @@
 /lib/modules/sdhci-msm.ko: /lib/modules/cqhci.ko /lib/modules/qcom_ice.ko /lib/modules/pinctrl-msm.ko /lib/modules/qcom_ipc_logging.ko /lib/modules/minidump.ko /lib/modules/qcom_dma_heaps.ko /lib/modules/msm_dma_iommu_mapping.ko /lib/modules/mem_buf_dev.ko /lib/modules/secure_buffer.ko /lib/modules/qcom-scm.ko /lib/modules/gh_rm_drv.ko /lib/modules/gh_msgq.ko /lib/modules/gh_dbl.ko /lib/modules/gh_arm_drv.ko /lib/modules/smem.ko /lib/modules/debug_symbol.ko /lib/modules/clk-qcom.ko /lib/modules/gdsc-regulator.ko /lib/modules/proxy-consumer.ko /lib/modules/debug-regulator.ko
 /lib/modules/spmi-pmic-arb.ko:
 /lib/modules/ucsi_qti_glink.ko: /lib/modules/qti_pmic_glink.ko /lib/modules/pdr_interface.ko /lib/modules/qmi_helpers.ko /lib/modules/rproc_qcom_common.ko /lib/modules/qcom_smd.ko /lib/modules/qcom_glink_smem.ko /lib/modules/qcom_glink.ko /lib/modules/qcom_ipc_logging.ko /lib/modules/minidump.ko /lib/modules/qcom_dma_heaps.ko /lib/modules/msm_dma_iommu_mapping.ko /lib/modules/mem_buf_dev.ko /lib/modules/secure_buffer.ko /lib/modules/qcom-scm.ko /lib/modules/gh_rm_drv.ko /lib/modules/gh_msgq.ko /lib/modules/gh_dbl.ko /lib/modules/gh_arm_drv.ko /lib/modules/smem.ko /lib/modules/debug_symbol.ko
+/lib/modules/adsp_loader_dlkm.ko: /lib/modules/spf_core_dlkm.ko /lib/modules/gpr_dlkm.ko /lib/modules/snd_event_dlkm.ko /lib/modules/q6_notifier_dlkm.ko /lib/modules/q6_pdr_dlkm.ko /lib/modules/pdr_interface.ko /lib/modules/rproc_qcom_common.ko /lib/modules/qcom_smd.ko /lib/modules/qcom_glink_smem.ko /lib/modules/qcom_glink.ko /lib/modules/qmi_helpers.ko
+/lib/modules/bm_adsp_ulog.ko: /lib/modules/qti_pmic_glink.ko /lib/modules/pdr_interface.ko /lib/modules/rproc_qcom_common.ko /lib/modules/qcom_smd.ko /lib/modules/qcom_glink_smem.ko /lib/modules/qcom_glink.ko /lib/modules/qmi_helpers.ko
+/lib/modules/goodix_brl_mmi.ko: /lib/modules/touchscreen_mmi.ko /lib/modules/mmi_relay.ko /lib/modules/hall_pen.ko /lib/modules/sensors_class.ko /lib/modules/panel_event_notifier.ko /lib/modules/mmi_info.ko /lib/modules/mmi_annotate.ko
+/lib/modules/gpr_dlkm.ko: /lib/modules/snd_event_dlkm.ko /lib/modules/q6_notifier_dlkm.ko /lib/modules/q6_pdr_dlkm.ko /lib/modules/pdr_interface.ko /lib/modules/rproc_qcom_common.ko /lib/modules/qcom_smd.ko /lib/modules/qcom_glink_smem.ko /lib/modules/qcom_glink.ko /lib/modules/qmi_helpers.ko
+/lib/modules/hall_pen.ko: /lib/modules/sensors_class.ko
+/lib/modules/mmi_annotate.ko:
+/lib/modules/mmi_charger.ko: /lib/modules/mmi_info.ko /lib/modules/mmi_annotate.ko
+/lib/modules/mmi_info.ko: /lib/modules/mmi_annotate.ko
+/lib/modules/mmi_relay.ko:
+/lib/modules/q6_notifier_dlkm.ko: /lib/modules/q6_pdr_dlkm.ko /lib/modules/pdr_interface.ko /lib/modules/rproc_qcom_common.ko /lib/modules/qcom_smd.ko /lib/modules/qcom_glink_smem.ko /lib/modules/qcom_glink.ko /lib/modules/qmi_helpers.ko
+/lib/modules/q6_pdr_dlkm.ko: /lib/modules/pdr_interface.ko /lib/modules/rproc_qcom_common.ko /lib/modules/qcom_smd.ko /lib/modules/qcom_glink_smem.ko /lib/modules/qcom_glink.ko /lib/modules/qmi_helpers.ko
+/lib/modules/qti_glink_charger.ko: /lib/modules/mmi_charger.ko /lib/modules/mmi_info.ko /lib/modules/mmi_annotate.ko /lib/modules/bm_adsp_ulog.ko /lib/modules/qti_pmic_glink.ko /lib/modules/pdr_interface.ko /lib/modules/rproc_qcom_common.ko /lib/modules/qcom_smd.ko /lib/modules/qcom_glink_smem.ko /lib/modules/qcom_glink.ko /lib/modules/qmi_helpers.ko
+/lib/modules/sensors_class.ko:
+/lib/modules/snd_event_dlkm.ko:
+/lib/modules/spf_core_dlkm.ko: /lib/modules/gpr_dlkm.ko /lib/modules/snd_event_dlkm.ko /lib/modules/q6_notifier_dlkm.ko /lib/modules/q6_pdr_dlkm.ko /lib/modules/pdr_interface.ko /lib/modules/rproc_qcom_common.ko /lib/modules/qcom_smd.ko /lib/modules/qcom_glink_smem.ko /lib/modules/qcom_glink.ko /lib/modules/qmi_helpers.ko
+/lib/modules/touchscreen_mmi.ko: /lib/modules/mmi_relay.ko /lib/modules/sensors_class.ko /lib/modules/panel_event_notifier.ko

@@ -1,0 +1,774 @@
+From a3dbd624e7c6518cfb3862f720cc1c9f02d15e6e Mon Sep 17 00:00:00 2001
+From: sammyz <2353166+sammyz@users.noreply.github.com>
+Date: Mon, 26 Oct 2026 13:11:19 +0000
+Subject: [PATCH 1/3] vold: import recovery key-blob and fscrypt keyring fixes
+
+Restore the no-upgrade early return before accessing the optional upgraded
+key blob. Create the fscrypt session keyring when recovery has no ring yet.
+Metadata and existing device-encrypted keys were loaded on Motorola mona
+without removing its logical System mapping.
+
+Imported from the user's earlier Antigravity session. Codex was used to
+review, test, organize, and commit these changes at sammyz's direction.
+Original upstream authorship and licenses remain intact.
+
+Change-Id: Id3dddd0fd97a264536b4f058c88f76a842c98579
+---
+ KeyStorage.cpp | 2 +-
+ KeyUtil.cpp    | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/KeyStorage.cpp b/KeyStorage.cpp
+index 51fc4f6..a6b81a3 100644
+--- a/KeyStorage.cpp
++++ b/KeyStorage.cpp
+@@ -370,7 +370,7 @@ static KeymasterOperation BeginKeymasterOp(Keymaster& keymaster, const std::stri
+     if (!opHandle) return opHandle;
+ 
+     // If key blob wasn't upgraded, nothing left to do.
+-    // if (!opHandle.getUpgradedBlob()) return opHandle;
++    if (!opHandle.getUpgradedBlob()) return opHandle;
+ 
+     // if (already_upgraded) {
+     //     LOG(ERROR) << "Unexpected case; already-upgraded key " << upgraded_blob_file
+diff --git a/KeyUtil.cpp b/KeyUtil.cpp
+index 9273564..3f1740d 100644
+--- a/KeyUtil.cpp
++++ b/KeyUtil.cpp
+@@ -148,6 +148,9 @@ static std::string buildLegacyKeyName(const std::string& prefix, const std::stri
+ // old to support FS_IOC_ADD_ENCRYPTION_KEY and FS_IOC_REMOVE_ENCRYPTION_KEY.
+ static bool fscryptKeyring(key_serial_t* device_keyring) {
+     *device_keyring = keyctl_search(KEY_SPEC_SESSION_KEYRING, "keyring", "fscrypt", 0);
++    if (*device_keyring == -1) {
++        *device_keyring = add_key("keyring", "fscrypt", 0, 0, KEY_SPEC_SESSION_KEYRING);
++    }
+     if (*device_keyring == -1) {
+         PLOG(ERROR) << "Unable to find device keyring";
+         return false;
+-- 
+2.43.0
+
+
+From b5d90bc60c78148d9ba943e4f3a11563b7a48180 Mon Sep 17 00:00:00 2001
+From: sammyz <2353166+sammyz@users.noreply.github.com>
+Date: Mon, 26 Oct 2026 13:11:19 +0000
+Subject: [PATCH 2/3] vold: load existing recovery DE keys without Android boot
+ provisioning
+
+Under ro.mona.recovery.readonly_keys, require existing system/user-0 keys,
+install them, and skip boot-time option/reference/per-boot-key writes and
+user-directory provisioning. The normal Android path is unchanged.
+
+Verified file reads from /data/system/packages.xml alongside
+/system_root/system/build.prop in normal TWRP startup. Credential-encrypted
+user storage remains a separate, unverified unlock step.
+
+Codex was used to make all changes in this commit at sammyz's direction.
+
+Change-Id: I351fa8fcd2fd1bf351a9e61b39edf76a0eab9ebb
+---
+ FsCrypt.cpp | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/FsCrypt.cpp b/FsCrypt.cpp
+index 7505e56..ddcbc48 100644
+--- a/FsCrypt.cpp
++++ b/FsCrypt.cpp
+@@ -455,6 +455,11 @@ bool fscrypt_initialize_systemwide_keys() {
+     EncryptionOptions options;
+     if (!get_data_file_encryption_options(&options)) return false;
+ 
++    if (android::base::GetBoolProperty("ro.mona.recovery.readonly_keys", false) &&
++        !android::vold::pathExists(device_key_path)) {
++        LOG(ERROR) << "Recovery: existing systemwide key is missing; refusing generation";
++        return false;
++    }
+     KeyBuffer device_key;
+ install:
+     if (!retrieveOrGenerateKey(device_key_path, device_key_temp, kEmptyAuthentication,
+@@ -473,6 +478,11 @@ install:
+         return false;
+     }
+ 
++    if (android::base::GetBoolProperty("ro.mona.recovery.readonly_keys", false)) {
++        de_key_raw_ref = device_policy.key_raw_ref;
++        LOG(INFO) << "Recovery: installed existing system DE key; skipping boot-time key writes";
++        return true;
++    }
+     std::string options_string;
+     if (!OptionsToString(device_policy.options, &options_string)) {
+         LOG(ERROR) << "Unable to serialize options";
+@@ -500,6 +510,14 @@ install:
+ 
+ bool fscrypt_init_user0() {
+     LOG(INFO) << "fscrypt_init_user0";
++    if (android::base::GetBoolProperty("ro.mona.recovery.readonly_keys", false)) {
++        if (!android::vold::pathExists(get_de_key_path(0))) {
++            LOG(ERROR) << "Recovery: existing user-0 DE key missing; refusing generation";
++            return false;
++        }
++        LOG(INFO) << "Recovery: loading existing DE keys without provisioning user directories";
++        return load_all_de_keys();
++    }
+     if (fscrypt_is_native()) {
+         if (!prepare_dir(user_key_dir, 0700, AID_ROOT, AID_ROOT)) return false;
+         if (!prepare_dir(user_key_dir + "/ce", 0700, AID_ROOT, AID_ROOT)) return false;
+-- 
+2.43.0
+
+
+From 772524f7943762dd9344960580020e70479a771c Mon Sep 17 00:00:00 2001
+From: sammyz <2353166+sammyz@users.noreply.github.com>
+Date: Mon, 26 Oct 2026 13:17:54 +0000
+Subject: [PATCH 3/3] vold: verify mona synthetic-password credentials through
+ AIDL Gatekeeper
+
+The old HIDL getService call fails before PIN verification on stock mona,
+whose Gatekeeper HAL exposes AIDL. Add a property-scoped verification-only
+client and submit the resulting HardwareAuthToken to Keystore. Fail closed
+on service/credential/token errors, honor timeout failures, and do not enroll
+or replace existing credentials. Keep legacy HIDL behavior for other builds.
+
+Import unchanged AOSP Gatekeeper V1 interface snapshots with their original
+licenses and provenance. Adapt their build to this recovery's existing
+wire-compatible KeyMint V1 HardwareAuthToken. Include client objects in
+static libvold for legacy Make consumers.
+
+Verified PIN unlock, twrp.user.0.decrypt=1, readable internal Android storage,
+and concurrent System and DE Data file reads on XT2517-1 Android 15.
+
+Codex was used to make the new integration and testing changes at sammyz's
+direction. Imported AOSP interface definitions remain credited to AOSP.
+
+Change-Id: Ia4627ea7c55bb7b28e9862ac07b3a2bcc0a6ef4d
+---
+ Android.bp                                    |  1 +
+ Decrypt.cpp                                   | 60 +++++++++++++++++++
+ mona_gatekeeper/Android.bp                    | 18 ++++++
+ mona_gatekeeper/README.md                     | 24 ++++++++
+ .../android.hardware.gatekeeper/1/.hash       |  1 +
+ .../gatekeeper/GatekeeperEnrollResponse.aidl  | 41 +++++++++++++
+ .../gatekeeper/GatekeeperVerifyResponse.aidl  | 40 +++++++++++++
+ .../hardware/gatekeeper/IGatekeeper.aidl      | 46 ++++++++++++++
+ .../gatekeeper/GatekeeperEnrollResponse.aidl  | 41 +++++++++++++
+ .../gatekeeper/GatekeeperVerifyResponse.aidl  | 40 +++++++++++++
+ .../hardware/gatekeeper/IGatekeeper.aidl      | 46 ++++++++++++++
+ .../gatekeeper/GatekeeperEnrollResponse.aidl  | 41 +++++++++++++
+ .../gatekeeper/GatekeeperVerifyResponse.aidl  | 40 +++++++++++++
+ .../hardware/gatekeeper/IGatekeeper.aidl      | 46 ++++++++++++++
+ 14 files changed, 485 insertions(+)
+ create mode 100644 mona_gatekeeper/Android.bp
+ create mode 100644 mona_gatekeeper/README.md
+ create mode 100644 mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/.hash
+ create mode 100644 mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl
+ create mode 100644 mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl
+ create mode 100644 mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/IGatekeeper.aidl
+ create mode 100644 mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl
+ create mode 100644 mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl
+ create mode 100644 mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/IGatekeeper.aidl
+ create mode 100644 mona_gatekeeper/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl
+ create mode 100644 mona_gatekeeper/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl
+ create mode 100644 mona_gatekeeper/android/hardware/gatekeeper/IGatekeeper.aidl
+
+diff --git a/Android.bp b/Android.bp
+index 376157b..1e85543 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -197,6 +197,7 @@ cc_library_static {
+         "libkeymint_support",
+     ],
+     whole_static_libs: [
++        "android.hardware.gatekeeper-V1-ndk_platform",
+         "com.android.sysprop.apex",
+         "libc++fs"
+     ],
+diff --git a/Decrypt.cpp b/Decrypt.cpp
+index d9f034b..7a0d160 100755
+--- a/Decrypt.cpp
++++ b/Decrypt.cpp
+@@ -56,6 +56,9 @@
+ #include <aidl/android/system/keystore2/IKeystoreService.h>
+ #include <aidl/android/system/keystore2/ResponseCode.h>
+ #include <android/hardware/gatekeeper/1.0/IGatekeeper.h>
++#include <aidl/android/hardware/gatekeeper/IGatekeeper.h>
++#include <android-base/properties.h>
++#include <openssl/mem.h>
+ 
+ #include <binder/IServiceManager.h>
+ #include <binder/IPCThreadState.h>
+@@ -639,6 +642,57 @@ bool Decrypt_CE_storage(const userid_t user_id, int token, const std::string& se
+ 
+ // /* Decrypt_User_Synth_Pass is the TWRP C++ equivalent to spBasedDoVerifyCredential
+ //  * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/LockSettingsService.java#1998 */
++// Codex: verify existing credentials through the stock AIDL HAL. Never enroll,
++// delete credentials, log secrets, or retry a rejected credential via another HAL.
++static bool VerifyMonaAidlGatekeeper(userid_t user_id,
++                                     const password_data_struct& pwd,
++                                     const unsigned char* password_token) {
++    using AidlGatekeeper = aidl::android::hardware::gatekeeper::IGatekeeper;
++    ndk::SpAIBinder binder(AServiceManager_checkService(
++        "android.hardware.gatekeeper.IGatekeeper/default"));
++    auto gatekeeper = AidlGatekeeper::fromBinder(binder);
++    if (!gatekeeper || pwd.handle_len <= 0 || !pwd.password_handle) {
++        printf("AIDL Gatekeeper service or existing credential handle unavailable\n");
++        return false;
++    }
++    void* derived = PersonalizedHashBinary(PERSONALIZATION_USER_GK_AUTH,
++        reinterpret_cast<const char*>(password_token), PASSWORD_TOKEN_SIZE);
++    if (!derived) return false;
++    const auto* bytes = static_cast<const uint8_t*>(derived);
++    std::vector<uint8_t> provided(bytes, bytes + SHA512_DIGEST_LENGTH);
++    const auto* handle_bytes = static_cast<const uint8_t*>(pwd.password_handle);
++    std::vector<uint8_t> enrolled(handle_bytes, handle_bytes + pwd.handle_len);
++    aidl::android::hardware::gatekeeper::GatekeeperVerifyResponse response;
++    auto status = gatekeeper->verify(fakeUid(user_id), 0, enrolled, provided, &response);
++    OPENSSL_cleanse(provided.data(), provided.size());
++    OPENSSL_cleanse(derived, SHA512_DIGEST_LENGTH);
++    free(derived);
++    if (!status.isOk()) {
++        printf("AIDL Gatekeeper transaction failed: %s\n", status.getDescription().c_str());
++        return false;
++    }
++    if (response.statusCode != AidlGatekeeper::STATUS_OK &&
++        response.statusCode != AidlGatekeeper::STATUS_REENROLL) {
++        printf("AIDL Gatekeeper verification failed: status=%d timeout_ms=%d\n",
++               response.statusCode, response.timeoutMs);
++        return false;
++    }
++    ndk::SpAIBinder auth_binder(AServiceManager_checkService("android.security.authorization"));
++    auto authorization = aidl::android::security::authorization::IKeystoreAuthorization::fromBinder(auth_binder);
++    if (!authorization) {
++        printf("AIDL Gatekeeper verified; Keystore authorization unavailable\n");
++        return false;
++    }
++    auto auth_status = authorization->addAuthToken(response.hardwareAuthToken);
++    if (!auth_status.isOk()) {
++        printf("AIDL Gatekeeper verified; auth token submission failed: %s\n",
++               auth_status.getDescription().c_str());
++        return false;
++    }
++    printf("AIDL Gatekeeper verified existing credential and submitted auth token\n");
++    return true;
++}
++
+ bool Decrypt_User_Synth_Pass(const userid_t user_id, const std::string& Password) {
+ 	printf("Attempting to decrypt user's synthetic password\n");
+ 	bool retval = false;
+@@ -749,6 +803,11 @@ bool Decrypt_User_Synth_Pass(const userid_t user_id, const std::string& Password
+ 		memcpy((void*)&application_id[0], (void*)&password_token[0], PASSWORD_TOKEN_SIZE);
+ 		memcpy((void*)&application_id[PASSWORD_TOKEN_SIZE], secdiscardable, SHA512_DIGEST_LENGTH);
+ 		if (Password != "!") {
++            if (android::base::GetBoolProperty("ro.mona.gatekeeper_aidl", false)) {
++                if (!VerifyMonaAidlGatekeeper(user_id, pwd, password_token))
++                    return Free_Return(retval, weaver_key, &pwd);
++            } else {
++
+ 			int ret = -1;
+ 			bool request_reenroll = false;
+ 			android::sp<android::hardware::gatekeeper::V1_0::IGatekeeper> gk_device;
+@@ -807,6 +866,7 @@ bool Decrypt_User_Synth_Pass(const userid_t user_id, const std::string& Password
+ 				printf("gatekeeper verification failed\n");
+ 				return Free_Return(retval, weaver_key, &pwd);
+ 			}
++            }
+ 		}
+ 	}
+ 	// Now we will handle https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java#816
+diff --git a/mona_gatekeeper/Android.bp b/mona_gatekeeper/Android.bp
+new file mode 100644
+index 0000000..33ce991
+--- /dev/null
++++ b/mona_gatekeeper/Android.bp
+@@ -0,0 +1,18 @@
++// AOSP Gatekeeper V1 interface, unchanged snapshot from android15-release.
++// Build against this recovery's KeyMint V1 HardwareAuthToken wire format.
++package {
++    default_applicable_licenses: ["Android-Apache-2.0"],
++}
++aidl_interface {
++    name: "android.hardware.gatekeeper",
++    vendor_available: true,
++    srcs: ["android/hardware/gatekeeper/*.aidl"],
++    imports: ["android.hardware.security.keymint-V1"],
++    stability: "vintf",
++    versions: ["1"],
++    backend: {
++        java: { enabled: false },
++        cpp: { enabled: false },
++        ndk: { apps_enabled: false },
++    },
++}
+diff --git a/mona_gatekeeper/README.md b/mona_gatekeeper/README.md
+new file mode 100644
+index 0000000..5d6c921
+--- /dev/null
++++ b/mona_gatekeeper/README.md
+@@ -0,0 +1,24 @@
++# Recovery Gatekeeper AIDL client interface
++
++The three AIDL source files and their V1 API snapshots are unchanged AOSP
++Gatekeeper V1 files from:
++https://android.googlesource.com/platform/hardware/interfaces/+/refs/heads/android15-release/gatekeeper/aidl/aidl_api/android.hardware.gatekeeper/1/
++
++Original AOSP copyright and Apache-2.0 notices are retained. The Android.bp
++integration is a Codex adaptation for this pinned Android 12.1 recovery only.
++It imports KeyMint V1, whose HardwareAuthToken parcel fields match KeyMint V3
++on the tested mona firmware. The generated Gatekeeper client is linked into
++libvold statically so legacy Make consumers receive its code; those consumers
++also link the existing KeyMint V1 parcelable library explicitly.
++
++The client uses the stock android.hardware.gatekeeper.IGatekeeper/default
++service. It only verifies the existing synthetic-password credential and
++forwards the HAL's HardwareAuthToken to Keystore authorization. It does not
++enroll, reset, delete, or re-enroll credentials, including on STATUS_REENROLL.
++It fails on rejected credentials, timeouts, unavailable services, or token
++submission failures. PINs and derived password tokens are not logged.
++
++Codex was used to implement, build, and test the integration at sammyz's
++direction. The interface definitions remain AOSP's work. Verified on XT2517-1
++V2VAS35.29-49-1: PIN accepted, user 0 CE storage unlocked, System and Data file
++reads successful together. Recovery-only opt-in: ro.mona.gatekeeper_aidl=true.
+diff --git a/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/.hash b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/.hash
+new file mode 100644
+index 0000000..f06e62b
+--- /dev/null
++++ b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/.hash
+@@ -0,0 +1 @@
++d877e8a1608a00fd9068bcd7e69ea480a7ea17f0
+diff --git a/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl
+new file mode 100644
+index 0000000..ae64ffc
+--- /dev/null
++++ b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package android.hardware.gatekeeper;
++@VintfStability
++parcelable GatekeeperEnrollResponse {
++  int statusCode;
++  int timeoutMs;
++  long secureUserId;
++  byte[] data;
++}
+diff --git a/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl
+new file mode 100644
+index 0000000..f55da30
+--- /dev/null
++++ b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl
+@@ -0,0 +1,40 @@
++/*
++ * Copyright (C) 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package android.hardware.gatekeeper;
++@VintfStability
++parcelable GatekeeperVerifyResponse {
++  int statusCode;
++  int timeoutMs;
++  android.hardware.security.keymint.HardwareAuthToken hardwareAuthToken;
++}
+diff --git a/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/IGatekeeper.aidl b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/IGatekeeper.aidl
+new file mode 100644
+index 0000000..ab74615
+--- /dev/null
++++ b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/1/android/hardware/gatekeeper/IGatekeeper.aidl
+@@ -0,0 +1,46 @@
++/*
++ * Copyright (C) 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package android.hardware.gatekeeper;
++@SensitiveData @VintfStability
++interface IGatekeeper {
++  void deleteAllUsers();
++  void deleteUser(in int uid);
++  android.hardware.gatekeeper.GatekeeperEnrollResponse enroll(in int uid, in byte[] currentPasswordHandle, in byte[] currentPassword, in byte[] desiredPassword);
++  android.hardware.gatekeeper.GatekeeperVerifyResponse verify(in int uid, in long challenge, in byte[] enrolledPasswordHandle, in byte[] providedPassword);
++  const int STATUS_REENROLL = 1;
++  const int STATUS_OK = 0;
++  const int ERROR_GENERAL_FAILURE = (-1) /* -1 */;
++  const int ERROR_RETRY_TIMEOUT = (-2) /* -2 */;
++  const int ERROR_NOT_IMPLEMENTED = (-3) /* -3 */;
++}
+diff --git a/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl
+new file mode 100644
+index 0000000..ae64ffc
+--- /dev/null
++++ b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package android.hardware.gatekeeper;
++@VintfStability
++parcelable GatekeeperEnrollResponse {
++  int statusCode;
++  int timeoutMs;
++  long secureUserId;
++  byte[] data;
++}
+diff --git a/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl
+new file mode 100644
+index 0000000..f55da30
+--- /dev/null
++++ b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl
+@@ -0,0 +1,40 @@
++/*
++ * Copyright (C) 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package android.hardware.gatekeeper;
++@VintfStability
++parcelable GatekeeperVerifyResponse {
++  int statusCode;
++  int timeoutMs;
++  android.hardware.security.keymint.HardwareAuthToken hardwareAuthToken;
++}
+diff --git a/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/IGatekeeper.aidl b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/IGatekeeper.aidl
+new file mode 100644
+index 0000000..ab74615
+--- /dev/null
++++ b/mona_gatekeeper/aidl_api/android.hardware.gatekeeper/current/android/hardware/gatekeeper/IGatekeeper.aidl
+@@ -0,0 +1,46 @@
++/*
++ * Copyright (C) 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package android.hardware.gatekeeper;
++@SensitiveData @VintfStability
++interface IGatekeeper {
++  void deleteAllUsers();
++  void deleteUser(in int uid);
++  android.hardware.gatekeeper.GatekeeperEnrollResponse enroll(in int uid, in byte[] currentPasswordHandle, in byte[] currentPassword, in byte[] desiredPassword);
++  android.hardware.gatekeeper.GatekeeperVerifyResponse verify(in int uid, in long challenge, in byte[] enrolledPasswordHandle, in byte[] providedPassword);
++  const int STATUS_REENROLL = 1;
++  const int STATUS_OK = 0;
++  const int ERROR_GENERAL_FAILURE = (-1) /* -1 */;
++  const int ERROR_RETRY_TIMEOUT = (-2) /* -2 */;
++  const int ERROR_NOT_IMPLEMENTED = (-3) /* -3 */;
++}
+diff --git a/mona_gatekeeper/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl b/mona_gatekeeper/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl
+new file mode 100644
+index 0000000..ae64ffc
+--- /dev/null
++++ b/mona_gatekeeper/android/hardware/gatekeeper/GatekeeperEnrollResponse.aidl
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package android.hardware.gatekeeper;
++@VintfStability
++parcelable GatekeeperEnrollResponse {
++  int statusCode;
++  int timeoutMs;
++  long secureUserId;
++  byte[] data;
++}
+diff --git a/mona_gatekeeper/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl b/mona_gatekeeper/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl
+new file mode 100644
+index 0000000..f55da30
+--- /dev/null
++++ b/mona_gatekeeper/android/hardware/gatekeeper/GatekeeperVerifyResponse.aidl
+@@ -0,0 +1,40 @@
++/*
++ * Copyright (C) 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package android.hardware.gatekeeper;
++@VintfStability
++parcelable GatekeeperVerifyResponse {
++  int statusCode;
++  int timeoutMs;
++  android.hardware.security.keymint.HardwareAuthToken hardwareAuthToken;
++}
+diff --git a/mona_gatekeeper/android/hardware/gatekeeper/IGatekeeper.aidl b/mona_gatekeeper/android/hardware/gatekeeper/IGatekeeper.aidl
+new file mode 100644
+index 0000000..ab74615
+--- /dev/null
++++ b/mona_gatekeeper/android/hardware/gatekeeper/IGatekeeper.aidl
+@@ -0,0 +1,46 @@
++/*
++ * Copyright (C) 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package android.hardware.gatekeeper;
++@SensitiveData @VintfStability
++interface IGatekeeper {
++  void deleteAllUsers();
++  void deleteUser(in int uid);
++  android.hardware.gatekeeper.GatekeeperEnrollResponse enroll(in int uid, in byte[] currentPasswordHandle, in byte[] currentPassword, in byte[] desiredPassword);
++  android.hardware.gatekeeper.GatekeeperVerifyResponse verify(in int uid, in long challenge, in byte[] enrolledPasswordHandle, in byte[] providedPassword);
++  const int STATUS_REENROLL = 1;
++  const int STATUS_OK = 0;
++  const int ERROR_GENERAL_FAILURE = (-1) /* -1 */;
++  const int ERROR_RETRY_TIMEOUT = (-2) /* -2 */;
++  const int ERROR_NOT_IMPLEMENTED = (-3) /* -3 */;
++}
+-- 
+2.43.0

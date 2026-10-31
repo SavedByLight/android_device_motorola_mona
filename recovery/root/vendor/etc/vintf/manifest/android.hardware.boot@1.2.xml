@@ -1,0 +1,2 @@
+<!-- Use the packaged mona passthrough HAL declared in mona-bootctrl.xml. -->
+<manifest version="1.0" type="device" />

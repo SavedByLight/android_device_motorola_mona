@@ -54,6 +54,12 @@ subsystem vfio
 /dev/dma_heap/system      0444   system     system
 /dev/dma_heap/system-uncached      0444   system     system
 /dev/dma_heap/system-secure        0444   system     system
+/dev/dma_heap/qcom,*      0444   system     system
+/dev/qseecom              0660   system     drmrpc
+/dev/smcinvoke            0660   system     drmrpc
+/dev/sp_keymaster         0660   system     system
+/dev/sp_keymaster_ssr     0660   system     system
+/dev/0:0:0:49476          0660   system     drmrpc
 
 #For ATT IQI
 /dev/iqi_bridge           0660   system     vendor_bridge_rw

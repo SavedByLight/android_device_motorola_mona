@@ -1,0 +1,2 @@
+# Patch context preserves source indentation and blank context lines.
+patches/*.patch -whitespace

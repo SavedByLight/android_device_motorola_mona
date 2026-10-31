@@ -1,0 +1,222 @@
+{
+  "provenance": "Stock Motorola/Qualcomm prebuilts imported from sammyz's earlier Antigravity recovery experiment; not newly authored source code.",
+  "firmware": "motorola/mona_g/mona:15/V2VAS35.29-49-1/03a3a-6df9b8:user/release-keys",
+  "license_note": "Original binary licensing applies; device-tree source licenses do not replace it.",
+  "files": [
+    {
+      "path": "recovery/root/vendor/bin/hw/android.hardware.gatekeeper-service-qti",
+      "size": 51184,
+      "sha256": "37c4ed8b519cf3325c4a4a29631687502595bc7885d3c5e4644778dc67150077"
+    },
+    {
+      "path": "recovery/root/vendor/bin/hw/android.hardware.security.keymint-service-qti",
+      "size": 85120,
+      "sha256": "13c31ec979e91bdebb355e79313226c375cdc12652658d97467e1f8ee3ab998a"
+    },
+    {
+      "path": "recovery/root/vendor/bin/hw/vendor.qti.hardware.qseecom@1.0-service",
+      "size": 51928,
+      "sha256": "8d1200062bf5bccf3ceb1f88f124d3d13a5896d3f19bbdf6ec561686aaf63418"
+    },
+    {
+      "path": "recovery/root/vendor/bin/qseecomd",
+      "size": 52048,
+      "sha256": "25ce0317505802bb1e96d279326cbbc22aeb0264150c37bc244f53451c7d1e75"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/android.hardware.common-V2-ndk.so",
+      "size": 52040,
+      "sha256": "93ccacaaa08d125ebb6ea5b5c9aaf8f231726ad441067d27279aefcbb3b8cc15"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/android.hardware.gatekeeper-V1-ndk.so",
+      "size": 85640,
+      "sha256": "4de68ff3806fe641e1308a1e75b5ff036b63e05b0e69edf3cb6d2aea862772fa"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/android.hardware.keymaster@3.0.so",
+      "size": 189016,
+      "sha256": "1ab2a1e0c22775019b6acf4d188fde35290b3fba4e6c1057439c48ee62e31c62"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/android.hardware.keymaster@4.0.so",
+      "size": 207072,
+      "sha256": "b233262ed7eca3e3dca50c0ac06878d95f006102ae45c509a4fc025eee8c84e4"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/android.hardware.keymaster@4.1.so",
+      "size": 154256,
+      "sha256": "dddbe5ca3e31bd2f6c6b57281c7de93447b57b8f0daefa926a744f62497eaf0a"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/android.hardware.security.keymint-V3-ndk.so",
+      "size": 153608,
+      "sha256": "0c462c789bb2fd3dea8f36bffed6635eeea1f9cec2f4930f14a699d3638f06c3"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/android.hardware.security.rkp-V3-ndk.so",
+      "size": 85840,
+      "sha256": "8c727007da9c7cf82df433171ee08aa211da29fafe626fb73be897c7f7c77989"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/android.hardware.security.secureclock-V1-ndk.so",
+      "size": 85488,
+      "sha256": "42fda24ff290bf4046b43abc933f02db3fa0b3b4c0b03b4459e57de4b7900767"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/android.hardware.security.sharedsecret-V1-ndk.so",
+      "size": 85704,
+      "sha256": "21c5d18be35dec6b44ba9da2f85b493ff3779418eea208f9ccccdd4409a14a18"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/hw/libqtigatekeeper.so",
+      "size": 101672,
+      "sha256": "a164ee95a8626d5659fa10f0380de35d8a44a13e87d50b0c80534b30f4ad98f4"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/hw/vendor.qti.hardware.qseecom@1.0-impl.so",
+      "size": 85352,
+      "sha256": "108e47557128b85e0d80695e98f2f8bcd95940dd2706e4a9c8adefc5486378f1"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libGPreqcancel.so",
+      "size": 51576,
+      "sha256": "ff75839aa66467d871e0ba57e8f9b684598220eb2e969bb7e5d05f2ed7498161"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libGPreqcancel_svc.so",
+      "size": 51672,
+      "sha256": "6e66d168cac48d775642f59800de1891bedf1021af1e053ce7db8d92b71410f6"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libQSEEComAPI.so",
+      "size": 84776,
+      "sha256": "892b3d7efee9084a212263d3e4de85b161ce79218c3ba80151216cb8d817428b"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libc++.so",
+      "size": 1083168,
+      "sha256": "794eb8fafd7be35da3725e9ec0b15189c6f4f2544f5b78afd8a647dde5b69195"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libcrypto.so",
+      "size": 1483960,
+      "sha256": "2444edf2dc1e17029ea2a63f2877b42be815738547271bf4aff5d83667909210"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libdiag.so",
+      "size": 371264,
+      "sha256": "4aad91fa1d520caa102c804488d264dff908a68aa0793f541bfc82462f79de01"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libdmabufheap.so",
+      "size": 102352,
+      "sha256": "1950aef00942c7ff2dd81ead0a511519cff3b4691b2595cbf5a8ecb6ba00c07b"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libdrm.so",
+      "size": 117280,
+      "sha256": "a6848908fc42225dfed68264b34c93d1955f742d6125dc8e63b3dd6b470887f3"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libdrmfs.so",
+      "size": 101000,
+      "sha256": "0627d18c5d4e6c87850ff534c29651e2b9079d56e69148c35286aec6ecd3f652"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libdrmtime.so",
+      "size": 51240,
+      "sha256": "8ad052e45f57316981cbd7a8b30333c6e3e82bb6ca4fa10f9ed0b03f83f9033b"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libgatekeeper.so",
+      "size": 36256,
+      "sha256": "7605eaa10495244bf8341649029550005754f0066cf2fa45d9847e5b73eb2efc"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libion.so",
+      "size": 51232,
+      "sha256": "de96725211278406e1005cd3c3d81514d0f32aff0076c7aa4534c30978a903bf"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libkeymaster_messages.so",
+      "size": 134624,
+      "sha256": "c1dcdf68c53d4de858a386a4b2ab8b1928eb8ef64f9e94a89573570f7f29d8e8"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libkeymasterdeviceutils.so",
+      "size": 51688,
+      "sha256": "dbae2feb0d4eba0db9108a1ae67bfb6e1cd122b46c172459a68705644491799a"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libkeymasterutils.so",
+      "size": 252576,
+      "sha256": "fac72e84fdf37e901d8d5ff36026c3c223d3eff679690796a9d3022f69f52143"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libops.so",
+      "size": 51824,
+      "sha256": "1607ef7049401006b0186a45b49a2952b8d41da8efe5d1c6baa9d56592bac8c7"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libqcbor.so",
+      "size": 52016,
+      "sha256": "d376fb56719a569a33761a771dc227acb394d3c3489ed49a1dadaa35e7e2d277"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libqisl.so",
+      "size": 51928,
+      "sha256": "cb3702fe1cc75d10850fe4c70aebebad50c4865b5c6922d352d5d8e95685dc8e"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libqtikeymint.so",
+      "size": 290520,
+      "sha256": "836269707fb0caae3337954368350ee75d676e5c2797b62512b13b2f71200d76"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/librpmb.so",
+      "size": 86024,
+      "sha256": "1bf82bd00284463a20e92c6b5402b1832a184b6123e64fa37ab34476e7604bae"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libseclog.so",
+      "size": 51376,
+      "sha256": "eae3df232e354bbefce73016c12b54237872a772bd1c46c12e9c77e859e9794c"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libspl.so",
+      "size": 51360,
+      "sha256": "fdd4b3b32f08bfa8eb1a50b0baf8916cc1ea19a366ac800fa712ff6debef7d88"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libssd.so",
+      "size": 51376,
+      "sha256": "b7a7224fef0abe088c9f3c7c3f9530256207c75d7f1cc17aac481ee219480026"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libtime_genoff.so",
+      "size": 51672,
+      "sha256": "dbf40d4edd9124c6a2bfb36346f0b6426fc27a80075c52a4d2b73b5efcc4d916"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/libxml2.so",
+      "size": 1207960,
+      "sha256": "67a48eb92cdbe240065208a69e258af54001045e4044689d5a2e0717096bc8af"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/vendor.qti.hardware.display.config-V7-ndk.so",
+      "size": 184336,
+      "sha256": "eba875e8c21f88fbfe362dc7c9653837c73993f30a79212c07b7373e0b6731c4"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/vendor.qti.hardware.qseecom-V1-ndk.so",
+      "size": 118992,
+      "sha256": "75e720f1b143669f9f9b75ef24c9b9f5b6338e8f84991841e6311d7cd38e4d91"
+    },
+    {
+      "path": "recovery/root/vendor/lib64/vendor.qti.hardware.qseecom@1.0.so",
+      "size": 170592,
+      "sha256": "6c2b9cdc1726d02b81920329e6dc66906cedf4951fc535b16ff2518955cd8087"
+    }
+  ]
+}

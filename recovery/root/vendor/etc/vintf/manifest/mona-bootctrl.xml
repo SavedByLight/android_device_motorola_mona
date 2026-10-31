@@ -1,0 +1,12 @@
+<!-- Recovery-only declaration for the packaged Qualcomm passthrough HAL. -->
+<manifest version="1.0" type="device">
+    <hal format="hidl">
+        <name>android.hardware.boot</name>
+        <transport arch="64">passthrough</transport>
+        <version>1.1</version>
+        <interface>
+            <name>IBootControl</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+</manifest>

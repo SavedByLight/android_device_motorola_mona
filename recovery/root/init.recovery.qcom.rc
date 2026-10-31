@@ -24,31 +24,77 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-import /init.recovery.qcom_decrypt.rc
-
 on property:ro.boot.usbcontroller=*
     setprop sys.usb.controller ${ro.boot.usbcontroller}
-    wait /sys/bus/platform/devices/${ro.boot.usb.dwc3_msm:-a600000.ssusb}/mode
-    write /sys/bus/platform/devices/${ro.boot.usb.dwc3_msm:-a600000.ssusb}/mode peripheral
     wait /sys/class/udc/${ro.boot.usbcontroller} 1
 
+on early-init
+    setprop ro.mona.recovery.readonly_keys true
+    setprop ro.mona.gatekeeper_aidl true
+    write /sys/module/firmware_class/parameters/path /firmware/image
+    exec u:r:recovery:s0 -- /system/bin/resetprop ro.build.version.release 16
+    exec u:r:recovery:s0 -- /system/bin/resetprop ro.build.version.security_patch 2026-10-01
+    exec u:r:recovery:s0 -- /system/bin/resetprop ro.vendor.build.security_patch 2025-05-01
+
+on init
+    chmod 0660 /dev/qseecom
+    chown system drmrpc /dev/qseecom
+    chmod 0660 /dev/smcinvoke
+    chown system drmrpc /dev/smcinvoke
+    chmod 0444 /dev/dma_heap/qcom,qseecom
+    chown system system /dev/dma_heap/qcom,qseecom
+    chmod 0444 /dev/dma_heap/qcom,qseecom-ta
+    chown system system /dev/dma_heap/qcom,qseecom-ta
+    chmod 0660 /dev/0:0:0:49476
+    chown system drmrpc /dev/0:0:0:49476
+
 on fs
-    wait /dev/block/platform/soc/${ro.boot.bootdevice}
+    wait /dev/block/platform/soc/${ro.boot.bootdevice} 5
     symlink /dev/block/platform/soc/${ro.boot.bootdevice} /dev/block/bootdevice
-
-        # Mount firmware
-    mkdir /firmware
-    mount vfat /dev/block/bootdevice/by-name/modem${ro.boot.slot_suffix} /firmware ro
-
-on boot
-    start health-hal-2-1
-
-on post-fs
-    start boot-hal-1-1
+    chmod 0660 /dev/0:0:0:49476
+    chown system drmrpc /dev/0:0:0:49476
+    mkdir /firmware 0755 root root
+    mount ext4 /dev/block/bootdevice/by-name/modem${ro.boot.slot_suffix} /firmware ro
+    symlink /firmware /vendor/firmware_mnt
+    mkdir /data/vendor 0755 root root
+    mkdir /data/vendor/keymaster 0775 system system
+    start vendor.qseecomd
+    start qseecom-service
+    start vendor.keymint-qti
+    start vendor.gatekeeper_default
+    start keystore2
 
 on property:twrp.modules.loaded=true
-    # Load ADSP firmware for PMIC
-    wait /sys/kernel/boot_adsp/boot
     write /sys/kernel/boot_adsp/boot 1
-    wait /sys/class/power_supply/battery
-    umount /firmware
+
+service vendor.qseecomd /vendor/bin/qseecomd
+    class core
+    user root
+    group root drmrpc
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/hw:/system/lib64
+    disabled
+    seclabel u:r:recovery:s0
+
+service qseecom-service /vendor/bin/hw/vendor.qti.hardware.qseecom@1.0-service
+    class hal
+    user system
+    group system drmrpc
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/hw:/system/lib64
+    disabled
+    seclabel u:r:recovery:s0
+
+service vendor.keymint-qti /vendor/bin/hw/android.hardware.security.keymint-service-qti
+    class early_hal
+    user system
+    group system drmrpc
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/hw:/system/lib64
+    disabled
+    seclabel u:r:recovery:s0
+
+service vendor.gatekeeper_default /vendor/bin/hw/android.hardware.gatekeeper-service-qti
+    class early_hal
+    user system
+    group system drmrpc
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/hw:/system/lib64
+    disabled
+    seclabel u:r:recovery:s0

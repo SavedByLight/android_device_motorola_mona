@@ -266,8 +266,8 @@ unsigned get_number_slots(struct boot_control_module *module)
 	while ((de = readdir(dir_bootdev))) {
 		if (de->d_name[0] == '.')
 			continue;
-		if (!strncmp(de->d_name, BOOT_IMG_PTN_NAME,
-					strlen(BOOT_IMG_PTN_NAME)))
+		// Count actual slots, not the unsuffixed boot alias.
+		if (!strcmp(de->d_name, "boot_a") || !strcmp(de->d_name, "boot_b"))
 			slot_count++;
 	}
 	closedir(dir_bootdev);

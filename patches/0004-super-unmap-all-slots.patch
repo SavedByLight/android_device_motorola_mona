@@ -1,0 +1,149 @@
+diff --git a/Android.mk b/Android.mk
+index 5070cf5..1809986 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -79,7 +79,7 @@ else
+     LOCAL_CFLAGS += -DTW_EXCLUDE_APEX
+ endif
+ 
+-LOCAL_STATIC_LIBRARIES += libavb libtwrpinstall libminadbd_services libinit libsnapshot_nobinder update_metadata-protos librecovery_utils libhealthhalutils
++LOCAL_STATIC_LIBRARIES += libdm libavb libtwrpinstall libminadbd_services libinit libsnapshot_nobinder update_metadata-protos librecovery_utils libhealthhalutils
+ LOCAL_SHARED_LIBRARIES += libfs_mgr libhardware android.hardware.boot@1.0 android.hardware.boot@1.1 android.hardware.boot@1.2 libprotobuf-cpp-lite liblp libutils libhidlbase android.hardware.health@2.0
+ LOCAL_C_INCLUDES += \
+     system/core/fs_mgr/libfs_avb/include/ \
+diff --git a/gui/gui.cpp b/gui/gui.cpp
+index 874cdd9..376cddf 100755
+--- a/gui/gui.cpp
++++ b/gui/gui.cpp
+@@ -439,8 +439,10 @@ static void setup_ors_command()
+ static void ors_command_done()
+ {
+ 	gui_set_FILE(NULL);
+-	fclose(orsout);
+-	orsout = NULL;
++	if (orsout) {
++		fclose(orsout);
++		orsout = NULL;
++	}
+ 
+ 	if (DataManager::GetIntValue("tw_page_done") == 0) {
+ 		// The select function will return ready to read and the
+@@ -473,7 +475,10 @@ static void ors_command_read()
+ 		if (DataManager::GetIntValue("tw_busy") != 0) {
+ 			fputs("Failed, operation in progress\n", orsout);
+ 			LOGINFO("Command cannot be performed, operation in progress.\n");
+-			fclose(orsout);
++			if (orsout) {
++				fclose(orsout);
++				orsout = NULL;
++			}
+ 		} else {
+ 			if (strlen(command) == 11 && strncmp(command, "dumpstrings", 11) == 0) {
+ 				gui_set_FILE(orsout);
+diff --git a/partitionmanager.cpp b/partitionmanager.cpp
+index 8c67766..e6909e8 100755
+--- a/partitionmanager.cpp
++++ b/partitionmanager.cpp
+@@ -54,6 +54,7 @@
+ #include <fs_mgr_overlayfs.h>
+ #include <fs_mgr/roots.h>
+ #include <libgsi/libgsi.h>
++#include <libdm/dm.h>
+ #include <liblp/liblp.h>
+ #include <libgsi/libgsi.h>
+ #include <liblp/builder.h>
+@@ -3738,42 +3739,62 @@ void TWPartitionManager::Unlock_Block_Partitions() {
+ }
+ 
+ bool TWPartitionManager::Unmap_Super_Devices() {
+-	bool destroyed = false;
++    // The UI describes current-slot mount points, while first-stage setup maps
++    // every non-empty logical partition. Enumerate Super metadata so inactive
++    // slot devices (for example system_b) cannot survive and collide with the
++    // snapshot manager's subsequent mapping pass.
++    const auto suffix = android::base::GetProperty("ro.boot.slot_suffix", "");
++    if (!suffix.empty() && suffix != "_a" && suffix != "_b") {
++        LOGERR("Unknown boot slot suffix; refusing dynamic partition cleanup\n");
++        return false;
++    }
++    const uint32_t slot = suffix == "_b" ? 1 : 0;
++    const auto super_device = "/dev/block/by-name/" + fs_mgr_get_super_partition_name(slot);
++    auto metadata = android::fs_mgr::ReadMetadata(super_device, slot);
++    if (!metadata) {
++        LOGERR("Cannot read Super metadata; refusing dynamic partition cleanup\n");
++        return false;
++    }
+ #ifndef TW_EXCLUDE_APEX
+-	twrpApex apex;
+-	apex.Unmount();
++    twrpApex apex;
++    apex.Unmount();
+ #endif
+-	for (auto iter = Partitions.begin(); iter != Partitions.end();) {
+-		LOGINFO("Checking partition: %s\n", (*iter)->Get_Mount_Point().c_str());
+-		if ((*iter)->Is_Super) {
+-			TWPartition *part = *iter;
+-			std::string bare_partition_name = Get_Bare_Partition_Name((*iter)->Get_Mount_Point());
+-			std::string blk_device_partition = bare_partition_name;
+-			if (DataManager::GetStrValue("tw_has_boot_slots") == "1")
+-				blk_device_partition.append(PartitionManager.Get_Active_Slot_Suffix());
+-			(*iter)->UnMount(false);
+-			LOGINFO("removing dynamic partition: %s\n", blk_device_partition.c_str());
+-			destroyed = DestroyLogicalPartition(blk_device_partition);
+-			std::string cow_partition = blk_device_partition + "-cow";
+-			std::string cow_partition_path = "/dev/block/mapper/" + cow_partition;
+-			struct stat st;
+-			if (lstat(cow_partition_path.c_str(), &st) == 0) {
+-				LOGINFO("removing cow partition: %s\n", cow_partition.c_str());
+-				destroyed = DestroyLogicalPartition(cow_partition);
+-			}
+-			iter = Partitions.erase(iter);
+-			delete part;
+-			if (!destroyed) {
+-				return false;
+-			}
+-		} else {
+-			++iter;
+-		}
+-	}
+-	return true;
++    // Keep the descriptors intact until the complete unmap succeeds. A failed
++    // attempt must not leave an empty UI list that makes a retry skip devices.
++    for (auto* part : Partitions) {
++        if (part->Is_Super && !part->UnMount(false)) {
++            LOGERR("Unable to unmount logical partition %s\n", part->Get_Mount_Point().c_str());
++            return false;
++        }
++    }
++    auto& dm = android::dm::DeviceMapper::Instance();
++    const auto unmap_if_present = [&](const std::string& name) -> bool {
++        if (dm.GetState(name) == android::dm::DmDeviceState::INVALID)
++            return true;
++        LOGINFO("Unmapping dynamic partition device: %s\n", name.c_str());
++        if (!DestroyLogicalPartition(name)) {
++            LOGERR("Unable to unmap dynamic partition device %s\n", name.c_str());
++            return false;
++        }
++        return true;
++    };
++    for (const auto& partition : metadata->partitions) {
++        const auto name = android::fs_mgr::GetPartitionName(partition);
++        if (!unmap_if_present(name) || !unmap_if_present(name + "-cow"))
++            return false;
++    }
++    for (auto iter = Partitions.begin(); iter != Partitions.end();) {
++        if ((*iter)->Is_Super) {
++            auto* part = *iter;
++            iter = Partitions.erase(iter);
++            delete part;
++        } else {
++            ++iter;
++        }
++    }
++    return true;
+ }
+ 
+-
+ bool TWPartitionManager::Check_Pending_Merges() {
+ 	auto sm = android::snapshot::SnapshotManager::NewForFirstStageMount();
+ 	if (!sm) {

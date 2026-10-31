@@ -1,0 +1,6 @@
+cc_binary {
+    name: "mona_bootctrl_check",
+    recovery: true,
+    srcs: ["bootctrl-check.cpp"],
+    shared_libs: ["libhidlbase", "libutils", "android.hardware.boot@1.0"],
+}

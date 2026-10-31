@@ -1,41 +1,62 @@
-<!--
-    Input:
-        device/qcom/parrot66/manifest_parrot.xml
-        device/moto/mona/manifest_mona.xml
--->
-<manifest version="4.0" type="device" target-level="202404">
-    <hal format="aidl">
-        <name>android.hardware.drm</name>
-        <fqname>IDrmFactory/wfdhdcp</fqname>
+<!-- Recovery-only manifest: the Android 15 stock sepolicy version is not
+     supported by the pinned Android 12 recovery libvintf. -->
+<manifest version="1.0" type="device" target-level="5">
+    <hal format="hidl">
+        <name>android.hidl.allocator</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IAllocator</name>
+            <instance>ashmem</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hidl.manager</name>
+        <transport>hwbinder</transport>
+        <version>1.2</version>
+        <interface>
+            <name>IServiceManager</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hidl.memory</name>
+        <transport arch="32+64">passthrough</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IMapper</name>
+            <instance>ashmem</instance>
+        </interface>
     </hal>
     <hal format="aidl">
         <name>android.hardware.gatekeeper</name>
         <fqname>IGatekeeper/default</fqname>
     </hal>
     <hal format="aidl">
-        <name>android.hardware.nfc</name>
-        <fqname>INfc/default</fqname>
+        <name>android.hardware.security.keymint</name>
+        <version>3</version>
+        <fqname>IKeyMintDevice/default</fqname>
+        <fqname>IRemotelyProvisionedComponent/default</fqname>
     </hal>
     <hal format="aidl">
-        <name>android.hardware.secure_element</name>
-        <fqname>ISecureElement/eSE1</fqname>
+        <name>android.hardware.security.secureclock</name>
+        <fqname>ISecureClock/default</fqname>
     </hal>
     <hal format="aidl">
-        <name>vendor.nxp.nxpnfc_aidl</name>
-        <fqname>INxpNfc/default</fqname>
+        <name>android.hardware.security.sharedsecret</name>
+        <fqname>ISharedSecret/default</fqname>
     </hal>
     <hal format="aidl">
-        <name>vendor.qti.hardware.wifidisplaysession_aidl</name>
-        <fqname>IWifiDisplaySession/default</fqname>
-        <fqname>IWifiDisplaySessionAudioTrack/default</fqname>
-        <fqname>IWifiDisplaySessionImageTrack/default</fqname>
-        <fqname>IWifiDisplaySessionVideoTrack/default</fqname>
+        <name>vendor.qti.hardware.qseecom</name>
+        <fqname>IQSEECom/default</fqname>
     </hal>
-    <hal format="hidl" override="true">
-        <name>vendor.qti.memory.pasrmanager</name>
+    <hal format="hidl">
+        <name>vendor.qti.hardware.qseecom</name>
         <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IQSEECom</name>
+            <instance>default</instance>
+        </interface>
     </hal>
-    <sepolicy>
-        <version>202404</version>
-    </sepolicy>
 </manifest>

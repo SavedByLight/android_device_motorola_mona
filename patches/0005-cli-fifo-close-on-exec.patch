@@ -1,0 +1,20 @@
+--- a/gui/gui.cpp
++++ b/gui/gui.cpp
+@@ -426,7 +426,7 @@
+ 		return;
+ 	}
+ 
+-	ors_read_fd = open(ORS_INPUT_FILE, O_RDONLY | O_NONBLOCK);
++	ors_read_fd = open(ORS_INPUT_FILE, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+ 	if (ors_read_fd < 0) {
+ 		LOGINFO("Unable to open %s\n", ORS_INPUT_FILE);
+ 		unlink(ORS_INPUT_FILE);
+@@ -462,7 +462,7 @@
+ 		command[1022] = '\n';
+ 		command[1023] = '\0';
+ 		LOGINFO("Command '%s' received\n", command);
+-		orsout = fopen(ORS_OUTPUT_FILE, "w");
++		orsout = fopen(ORS_OUTPUT_FILE, "we");
+ 		if (!orsout) {
+ 			close(ors_read_fd);
+ 			ors_read_fd = -1;

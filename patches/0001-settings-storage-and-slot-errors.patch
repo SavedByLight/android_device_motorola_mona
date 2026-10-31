@@ -1,0 +1,105 @@
+diff --git a/Android.mk b/Android.mk
+index 383adca..48b0537 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -242,6 +242,10 @@ endif
+ ifeq ($(BOARD_HAS_NO_REAL_SDCARD), true)
+     LOCAL_CFLAGS += -DBOARD_HAS_NO_REAL_SDCARD
+ endif
++ifneq ($(TW_SETTINGS_STORAGE_PATH),)
++LOCAL_CFLAGS += -DTW_SETTINGS_STORAGE_PATH=\"$(TW_SETTINGS_STORAGE_PATH)\"
++endif
++
+ ifneq ($(RECOVERY_SDCARD_ON_DATA),)
+ 	LOCAL_CFLAGS += -DRECOVERY_SDCARD_ON_DATA
+ endif
+diff --git a/data.cpp b/data.cpp
+index 0078524..46b7dc8 100644
+--- a/data.cpp
++++ b/data.cpp
+@@ -1115,15 +1115,19 @@ void DataManager::ReadSettingsFile(void)
+ 
+ 	memset(mkdir_path, 0, sizeof(mkdir_path));
+ 	memset(settings_file, 0, sizeof(settings_file));
+-	sprintf(mkdir_path, "%s%s", GetSettingsStoragePath().c_str(), GetStrValue(TW_RECOVERY_NAME).c_str());
+-	sprintf(settings_file, "%s%s", mkdir_path, TW_SETTINGS_FILE);
+-
+-	if (!PartitionManager.Mount_Settings_Storage(false))
+-	{
++	sprintf(mkdir_path, "%s/%s", GetSettingsStoragePath().c_str(), TW_RECOVERY_NAME);
++	sprintf(settings_file, "%s/%s", mkdir_path, TW_SETTINGS_FILE);
++
++	bool settings_mounted = false;
++	for (int attempt = 0; attempt < 10; ++attempt) {
++		if (PartitionManager.Mount_Settings_Storage(false)) {
++			settings_mounted = true;
++			break;
++		}
+ 		usleep(500000);
+-		if (!PartitionManager.Mount_Settings_Storage(false))
+-			gui_msg(Msg(msg::kError, "unable_to_mount=Unable to mount {1}")(settings_file));
+ 	}
++	if (!settings_mounted)
++		gui_msg(Msg(msg::kError, "unable_to_mount=Unable to mount {1}")(settings_file));
+ 
+ 	mkdir(mkdir_path, 0777);
+ 
+@@ -1143,7 +1147,11 @@ string DataManager::GetCurrentStoragePath(void)
+ 
+ string DataManager::GetSettingsStoragePath(void)
+ {
+-	return GetStrValue("tw_settings_path");
++#ifdef TW_SETTINGS_STORAGE_PATH
++    return TW_SETTINGS_STORAGE_PATH;
++#else
++    return GetStrValue("tw_settings_path");
++#endif
+ }
+ 
+ void DataManager::Vibrate(const string& varName)
+@@ -1161,5 +1169,5 @@ void DataManager::Vibrate(const string& varName)
+ void DataManager::LoadTWRPFolderInfo(void)
+ {
+ 	SetValue(TW_RECOVERY_FOLDER_VAR, TWFunc::Check_For_TwrpFolder());
+-	mBackingFile = GetSettingsStoragePath() + GetStrValue(TW_RECOVERY_NAME) + TW_SETTINGS_FILE;
++	mBackingFile = GetSettingsStoragePath() + "/" TW_RECOVERY_NAME "/" TW_SETTINGS_FILE;
+ }
+diff --git a/partitionmanager.cpp b/partitionmanager.cpp
+index 2766b4c..8c67766 100755
+--- a/partitionmanager.cpp
++++ b/partitionmanager.cpp
+@@ -655,7 +655,13 @@ void TWPartitionManager::Decrypt_Data() {
+ }
+ 
+ void TWPartitionManager::Setup_Settings_Storage_Partition(TWPartition* Part) {
++#ifdef TW_SETTINGS_STORAGE_PATH
++    TWPartition* configured = Find_Partition_By_Path(TW_SETTINGS_STORAGE_PATH);
++    if (configured)
++        Part = configured;
++#endif
+ 	DataManager::SetValue("tw_storage_path", Part->Storage_Path);
++	DataManager::SetValue("tw_settings_path", Part->Storage_Path);
+ }
+ 
+ void TWPartitionManager::Setup_Android_Secure_Location(TWPartition* Part) {
+@@ -3305,6 +3311,8 @@ void TWPartitionManager::Set_Active_Slot(const string& Slot) {
+ 		android::sp<IBootControl> module = IBootControl::getService();
+ 		if (module == nullptr) {
+ 			LOGERR("Error getting bootctrl module.\n");
++			gui_msg(Msg(msg::kError, "unable_set_boot_slot=Error changing bootloader boot slot to {1}")(Slot));
++			return;
+ 		} else {
+ 			uint32_t slot_number = 0;
+ 			if (Slot == "B")
+@@ -3312,8 +3320,10 @@ void TWPartitionManager::Set_Active_Slot(const string& Slot) {
+ 			CommandResult result;
+ 			auto ret = module->setActiveBootSlot(slot_number, [&result]
+ 					(const CommandResult &cb_result) { result = cb_result; });
+-			if (!ret.isOk() || !result.success)
++			if (!ret.isOk() || !result.success) {
+ 				gui_msg(Msg(msg::kError, "unable_set_boot_slot=Error changing bootloader boot slot to {1}")(Slot));
++				return;
++			}
+ 		}
+ 		DataManager::SetValue("tw_active_slot", Slot); // Doing this outside of this if block may result in a seg fault because the DataManager may not be ready yet
+ 	}

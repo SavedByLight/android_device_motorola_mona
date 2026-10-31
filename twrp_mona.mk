@@ -18,12 +18,12 @@ $(call inherit-product, device/motorola/mona/device.mk)
 PRODUCT_DEVICE := mona
 PRODUCT_NAME := twrp_mona
 PRODUCT_BRAND := motorola
-PRODUCT_MODEL := mona
+PRODUCT_MODEL := moto g stylus - 2025
 PRODUCT_MANUFACTURER := motorola
 
 PRODUCT_GMS_CLIENTID_BASE := android-motorola
 
 PRODUCT_BUILD_PROP_OVERRIDES += \
-    PRIVATE_BUILD_DESC="mona-user 15 V2VAS35V.29-59-ST2.5 c2e5e1 release-keys"
+    PRIVATE_BUILD_DESC="mona-user 15 V2VAS35.29-49-1 03a3a-6df9b8 release-keys"
 
-BUILD_FINGERPRINT := motorola/mona/mona:15/V2VAS35V.29-59-ST2.5/c2e5e1:user/release-keys
+BUILD_FINGERPRINT := motorola/mona/mona:15/V2VAS35.29-49-1/03a3a-6df9b8:user/release-keys
